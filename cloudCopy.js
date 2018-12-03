@@ -18,9 +18,17 @@ const verbose = false;   // Print verbose messages
 
 // Array of all the paths to sync.  The basename of the path is the remote container name.
 const ContainerPath = [
-    //"/tmp/JKH"
+    //"/tmp/JKH",
+    //"/tmp/JKH2"
     "/mnt/snap2/workfiles/webFiles/webPDFs",
-    "/mnt/snap2/workfiles/webFiles/issuuPDFs"
+    "/mnt/snap2/workfiles/webFiles/issuuPDFs",
+    "/mnt/snap2/workfiles/webFiles/mobileAds",
+    "/mnt/snap2/workfiles/webFiles/webResources",
+    "/mnt/snap2/workfiles/webFiles/mobileResources",
+    "/mnt/snap2/workfiles/webFiles/puzzleAnswers",
+    "/mnt/snap2/workfiles/webFiles/communityPhotos",
+    "/mnt/snap2/workfiles/webFiles/communityAds",
+    "/mnt/snap2/workfiles/webFiles/loweDown",
 ];
 
 const skipFilesStartingWith = [
@@ -85,79 +93,90 @@ for (var containerLoop=0; containerLoop < ContainerPath.length; containerLoop++)
     const myContainer = path.basename(localPath);
     verboseLog(`Local path set to: ${localPath}`);
 
-    // Retrieve array 'remoteFiles' of all remote files in container
-    client.getFiles(myContainer, options, function(err, remoteFiles){
-        console.log(`Container: '${myContainer}'`);
-        verboseLog(`Remote file count: ${remoteFiles.length}`);
+    // Get array 'items' all all local files in directory
+    fs.readdir(localPath, function(err, localFiles) {
 
-        // Get array 'items' all all local files in directory
-        fs.readdir(localPath, function(err, localFiles) {
-            count = 0;
-            verboseLog(`Local file count: ${localFiles.length}`);
+        if (err){
+            console.log(`Directory does not exist: ${localPath}`);
+        }
+        else
+        {
+            // Retrieve array 'remoteFiles' of all remote files in container
+            client.getFiles(myContainer, options, function(err, remoteFiles){
+                console.log(`Container: '${myContainer}'`);
+                verboseLog(`Remote file count: ${remoteFiles.length}`);
+        
+                count = 0;
+                verboseLog(`Local file count: ${localFiles.length}`);
 
-            // Loop through all our local files to see which need to be synced
-            for (var fileLoop=0; fileLoop < localFiles.length; fileLoop++) {
-                if ( ++count % 500 == 0){
-                    console.log(`Processed ${count} of ${localFiles.length}`)
-                }
+                console.log(`${localFiles.length} local files`);
 
-                fileName = localFiles[fileLoop];
-                fqp = path.join(localPath, fileName);
-
-                verboseLog(`File ${fileLoop + 1} of ${localFiles.length}`);
-                verboseLog(`   full path: ${fqp}`);
-                verboseLog(`   filename: ${fileName}`);
-                
-                let skip = false;
-                let skipFilesLoop = 0;
-
-                var stats = fs.statSync(fqp);
-
-                if (stats.isDirectory()){
-                    skip = true;
-                    verboseLog(`   skipping directory`);
-                }
-
-                while(!skip && skipFilesLoop < skipFilesStartingWith.length){
-                    if (fileName.startsWith(skipFilesStartingWith[skipFilesLoop])){
-                        skip = true;
-                        verboseLog(`   skipping: ${skipFilesStartingWith[skipFilesLoop]}`);
+                // Loop through all our local files to see which need to be synced
+                for (var fileLoop=0; fileLoop < localFiles.length; fileLoop++) {
+                    if ( ++count % 500 == 0){
+                        console.log(`Processed ${count}`)
                     }
 
-                    skipFilesLoop++;
-                }
+                    fileName = localFiles[fileLoop];
+                    fqp = path.join(localPath, fileName);
 
-                if (!skip){
-                    let localFileModDate = new Date(stats["mtime"]);
-                        
-                    verboseLog(`   modified date: ${localFileModDate}`);
+                    verboseLog(`File ${fileLoop + 1} of ${localFiles.length}`);
+                    verboseLog(`   full path: ${fqp}`);
+                    verboseLog(`   filename: ${fileName}`);
+                    
+                    let skip = false;
+                    let skipFilesLoop = 0;
 
-                    if ( localFileModDate > checkDate){
-                        remoteFile = remoteFiles.find(function(f){return f.name === fileName});
+                    var stats = fs.statSync(fqp);
+                            
+                    if (stats.isDirectory()){
+                        skip = true;
+                        verboseLog(`   skipping directory`);
+                    }
 
-                        if (remoteFile){
-                            verboseLog(`   file found in remote container`);
-                            const hash = md5File.sync(fqp);
+                    while(!skip && skipFilesLoop < skipFilesStartingWith.length){
+                        if (fileName.startsWith(skipFilesStartingWith[skipFilesLoop])){
+                            skip = true;
+                            verboseLog(`   skipping: ${skipFilesStartingWith[skipFilesLoop]}`);
+                        }
 
-                            if (remoteFile.etag != hash){
-                                console.log(`   Copying changed file: ${fileName}`);
-                                copyFile(client, myContainer, fqp, fileName);
+                        skipFilesLoop++;
+                    }
+
+                    if (!skip){
+                        let localFileModDate = new Date(stats["mtime"]);
+                            
+                        verboseLog(`   modified date: ${localFileModDate}`);
+
+                        if ( localFileModDate > checkDate){
+                            remoteFile = remoteFiles.find(function(f){return f.name === fileName});
+
+                            if (remoteFile){
+                                verboseLog(`   file found in remote container`);
+                                const hash = md5File.sync(fqp);
+
+                                if (remoteFile.etag != hash){
+                                    console.log(`   Copying changed file: ${fileName}`);
+                                    copyFile(client, myContainer, fqp, fileName);
+                                }
+                                else{
+                                    verboseLog(`   md5 same so skipping`);
+                                }
                             }
                             else{
-                                verboseLog(`   md5 same so skipping`);
+                                // File not in remote container so copy it over
+                                console.log(`   Copying new file: ${fileName}`);
+                                copyFile(client, myContainer, fqp, fileName);
                             }
                         }
                         else{
-                            // File not in remote container so copy it over
-                            console.log(`   Copying new file: ${fileName}`);
-                            copyFile(client, myContainer, fqp, fileName);
+                            verboseLog(`   skipping because of date`);
                         }
                     }
-                    else{
-                        verboseLog(`   skipping because of date`);
-                    }
                 }
-            }
-        });
+
+                console.log(`Done.`);
+            });
+        }
     });
 }
