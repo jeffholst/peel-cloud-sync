@@ -14,13 +14,17 @@ const md5File = require('md5-file');
                                      
 */
 
-const verbose = false;   // Print verbose messages
+const verbose = true;   // Print verbose messages
 
 // Array of all the paths to sync.  The basename of the path is the remote container name.
 const ContainerPath = [
-    "/home/jeff/repos/peel-cloud-sync/UploadFiles/JKH"
+    "/tmp/JKH"
 ];
 
+const skipFilesStartingWith = [
+    "."
+];
+ 
 // Only sync files > checkDate
 const checkDate = new Date();
 // Set checkDate to 13 months prior to current date
@@ -97,35 +101,54 @@ for (var containerLoop=0; containerLoop < ContainerPath.length; containerLoop++)
                 verboseLog(`   full path: ${fqp}`);
                 verboseLog(`   filename: ${fileName}`);
                 
+                let skip = false;
+                let count = 0;
+
                 var stats = fs.statSync(fqp);
-                
-                let localFileModDate = new Date(stats["mtime"]);
-                    
-                verboseLog(`   modified date: ${localFileModDate}`);
 
-                if ( localFileModDate > checkDate){
-                    remoteFile = remoteFiles.find(function(f){return f.name === fileName});
+                if (stats.isDirectory()){
+                    skip = true;
+                    verboseLog(`   skipping directory`);
+                }
 
-                    if (remoteFile){
-                        verboseLog(`   file found in remote container`);
-                        const hash = md5File.sync(fqp);
+                while(!skip && count < skipFilesStartingWith.length){
+                    if (fileName.startsWith(skipFilesStartingWith[count])){
+                        skip = true;
+                        verboseLog(`   skipping: ${skipFilesStartingWith[count]}`);
+                    }
 
-                        if (remoteFile.etag != hash){
-                            console.log(`   Copying changed file: ${fileName}`);
-                            copyFile(client, myContainer, fqp, fileName);
+                    count++;
+                }
+
+                if (!skip){
+                    let localFileModDate = new Date(stats["mtime"]);
+                        
+                    verboseLog(`   modified date: ${localFileModDate}`);
+
+                    if ( localFileModDate > checkDate){
+                        remoteFile = remoteFiles.find(function(f){return f.name === fileName});
+
+                        if (remoteFile){
+                            verboseLog(`   file found in remote container`);
+                            const hash = md5File.sync(fqp);
+
+                            if (remoteFile.etag != hash){
+                                console.log(`   Copying changed file: ${fileName}`);
+                                copyFile(client, myContainer, fqp, fileName);
+                            }
+                            else{
+                                verboseLog(`   md5 same so skipping`);
+                            }
                         }
                         else{
-                            verboseLog(`   md5 same so skippin`);
+                            // File not in remote container so copy it over
+                            console.log(`   Copying new file: ${fileName}`);
+                            copyFile(client, myContainer, fqp, fileName);
                         }
                     }
                     else{
-                        // File not in remote container so copy it over
-                        console.log(`   Copying new file: ${fileName}`);
-                        copyFile(client, myContainer, fqp, fileName);
+                        verboseLog(`   skipping because of date`);
                     }
-                }
-                else{
-                    verboseLog(`   skipping because of date`);
                 }
             }
         });
