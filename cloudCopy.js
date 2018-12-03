@@ -14,11 +14,12 @@ const md5File = require('md5-file');
                                      
 */
 
-const verbose = true;   // Print verbose messages
+const verbose = false;   // Print verbose messages
 
 // Array of all the paths to sync.  The basename of the path is the remote container name.
 const ContainerPath = [
     "/tmp/JKH"
+    // "/mnt/snap2/workfiles/webFiles/webPDFs"
 ];
 
 const skipFilesStartingWith = [
@@ -76,8 +77,10 @@ function verboseLog(msg){
     }
 }
 
+let count;
 // Loop through each directory we want to sync
 for (var containerLoop=0; containerLoop < ContainerPath.length; containerLoop++) {
+    count = 0;
     const localPath = ContainerPath[containerLoop];
     const myContainer = path.basename(localPath);
     verboseLog(`Local path set to: ${localPath}`);
@@ -94,6 +97,10 @@ for (var containerLoop=0; containerLoop < ContainerPath.length; containerLoop++)
 
             // Loop through all our local files to see which need to be synced
             for (var fileLoop=0; fileLoop < localFiles.length; fileLoop++) {
+                if ( ++count % 500 == 0){
+                    console.log(`Processed ${count} of ${localFiles.length}`)
+                }
+
                 fileName = localFiles[fileLoop];
                 fqp = path.join(localPath, fileName);
 
@@ -102,7 +109,7 @@ for (var containerLoop=0; containerLoop < ContainerPath.length; containerLoop++)
                 verboseLog(`   filename: ${fileName}`);
                 
                 let skip = false;
-                let count = 0;
+                let skipFilesLoop = 0;
 
                 var stats = fs.statSync(fqp);
 
@@ -111,13 +118,13 @@ for (var containerLoop=0; containerLoop < ContainerPath.length; containerLoop++)
                     verboseLog(`   skipping directory`);
                 }
 
-                while(!skip && count < skipFilesStartingWith.length){
-                    if (fileName.startsWith(skipFilesStartingWith[count])){
+                while(!skip && skipFilesLoop < skipFilesStartingWith.length){
+                    if (fileName.startsWith(skipFilesStartingWith[skipFilesLoop])){
                         skip = true;
-                        verboseLog(`   skipping: ${skipFilesStartingWith[count]}`);
+                        verboseLog(`   skipping: ${skipFilesStartingWith[skipFilesLoop]}`);
                     }
 
-                    count++;
+                    skipFilesLoop++;
                 }
 
                 if (!skip){
