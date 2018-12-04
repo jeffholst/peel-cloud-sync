@@ -180,6 +180,19 @@ function getRemoteFiles(localPath, myContainer, localFiles){
 
 function readDirectory(localPath, myContainer){
     // Get array 'items' all all local files in directory
+
+    if (fs.existsSync(localPath)) {
+        localFiles = fs.readdirSync(localPath);
+
+        for (var loop = 0; loop < localFiles.length; loop++){
+            getRemoteFiles(localPath, myContainer, localFiles);
+        }
+    }
+    else{
+        console.log(`Directory does not exist: ${localPath}`);
+    }
+    
+    /*
     fs.readdir(localPath, function(err, localFiles) {
 
         if (err){
@@ -190,6 +203,7 @@ function readDirectory(localPath, myContainer){
             getRemoteFiles(localPath, myContainer, localFiles);
         }
     });
+    */
 }
 
 function verboseLog(msg){
