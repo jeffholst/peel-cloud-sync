@@ -186,6 +186,7 @@ function readDirectory(localPath, myContainer){
 
         for (var loop = 0; loop < localFiles.length; loop++){
             getRemoteFiles(localPath, myContainer, localFiles);
+            loop++;
         }
     }
     else{
