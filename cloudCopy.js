@@ -19,9 +19,9 @@ const maxFilesToCopy = 100; // maxium number of files to copy per execution
 
 // Array of all the paths to sync.  The basename of the path is the remote container name.
 const ContainerPath = [
-    "/tmp/JKH",
-    "/tmp/JKH2"
-    /*
+    //"/tmp/JKH",
+    //"/tmp/JKH2"
+   
     "/mnt/snap2/workfiles/webFiles/webPDFs",
     "/mnt/snap2/workfiles/webFiles/issuuPDFs",
     "/mnt/snap2/workfiles/webFiles/mobileAds",
@@ -31,7 +31,7 @@ const ContainerPath = [
     "/mnt/snap2/workfiles/webFiles/communityPhotos",
     "/mnt/snap2/workfiles/webFiles/communityAds",
     "/mnt/snap2/workfiles/webFiles/loweDown",
-    */
+   
 ];
 
 const skipFilesStartingWith = [
@@ -178,6 +178,20 @@ function getRemoteFiles(localPath, myContainer, localFiles){
     });
 }
 
+function readDirectory(localPath, myContainer){
+    // Get array 'items' all all local files in directory
+    fs.readdir(localPath, function(err, localFiles) {
+
+        if (err){
+            console.log(`Directory does not exist: ${localPath}`);
+        }
+        else
+        {
+            getRemoteFiles(localPath, myContainer, localFiles);
+        }
+    });
+}
+
 function verboseLog(msg){
     // prints verbose messages when verbose=true
     if (verbose){
@@ -194,16 +208,6 @@ for (var containerLoop=0; containerLoop < ContainerPath.length; containerLoop++)
 
     if ( filesCopied <= maxFilesToCopy )
     {
-        // Get array 'items' all all local files in directory
-        fs.readdir(localPath, function(err, localFiles) {
-
-            if (err){
-                console.log(`Directory does not exist: ${localPath}`);
-            }
-            else
-            {
-                getRemoteFiles(localPath, myContainer, localFiles);
-            }
-        });
+        readDirectory(localPath, myContainer);
     }
 }
