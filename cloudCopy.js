@@ -14,12 +14,14 @@ const md5File = require('md5-file');
                                      
 */
 
-const verbose = false;   // Print verbose messages
+const verbose = false;      // Print verbose messages
+const maxFilesToCopy = 100; // maxium number of files to copy per execution
 
 // Array of all the paths to sync.  The basename of the path is the remote container name.
 const ContainerPath = [
-    //"/tmp/JKH",
-    //"/tmp/JKH2"
+    "/tmp/JKH",
+    "/tmp/JKH2"
+    /*
     "/mnt/snap2/workfiles/webFiles/webPDFs",
     "/mnt/snap2/workfiles/webFiles/issuuPDFs",
     "/mnt/snap2/workfiles/webFiles/mobileAds",
@@ -29,6 +31,7 @@ const ContainerPath = [
     "/mnt/snap2/workfiles/webFiles/communityPhotos",
     "/mnt/snap2/workfiles/webFiles/communityAds",
     "/mnt/snap2/workfiles/webFiles/loweDown",
+    */
 ];
 
 const skipFilesStartingWith = [
@@ -41,6 +44,8 @@ const checkDate = new Date();
 checkDate.setMonth(checkDate.getMonth() - 13);
 
 // Nothing below here should need to be changed
+
+let filesCopied = 0;
 
 // Client credentials
 var client = pkgcloud.storage.createClient({
@@ -55,7 +60,8 @@ var options = {
     limit: Infinity // Infinity = all files, otherwise use integer
 };
 
-function copyFile(cliient, myContainer, localFile, remoteFile){
+function copyFile(myContainer, localFile, remoteFile){
+    
     // Copies localFile to myContainer/remoteFile
 
     // Create a read stream for our source file
@@ -75,8 +81,103 @@ function copyFile(cliient, myContainer, localFile, remoteFile){
         // TODO handle successful upload case
     });
 
+    filesCopied++;
+
     // pipe the source to the destination
     source.pipe(dest);
+}
+
+function copyFiles(localPath, myContainer, localFiles, remoteFiles){
+    console.log(`Container: '${myContainer}'`);
+    verboseLog(`Remote file count: ${remoteFiles.length}`);
+
+    let count = 0;
+    verboseLog(`Local file count: ${localFiles.length}`);
+
+    console.log(`${localFiles.length} local files`);
+
+    // Loop through all our local files to see which need to be synced
+    let fileLoop = 0;
+    while (fileLoop < localFiles.length && filesCopied <= maxFilesToCopy)
+    {
+        if ( ++count % 500 == 0){
+            console.log(`Processed ${count}`)
+        }
+
+        fileName = localFiles[fileLoop];
+        fqp = path.join(localPath, fileName);
+
+        verboseLog(`File ${fileLoop + 1} of ${localFiles.length}`);
+        verboseLog(`   full path: ${fqp}`);
+        verboseLog(`   filename: ${fileName}`);
+        
+        let skip = false;
+        let skipFilesLoop = 0;
+
+        var stats = fs.statSync(fqp);
+                
+        if (stats.isDirectory()){
+            skip = true;
+            verboseLog(`   skipping directory`);
+        }
+
+        while(!skip && skipFilesLoop < skipFilesStartingWith.length){
+            if (fileName.startsWith(skipFilesStartingWith[skipFilesLoop])){
+                skip = true;
+                verboseLog(`   skipping: ${skipFilesStartingWith[skipFilesLoop]}`);
+            }
+
+            skipFilesLoop++;
+        }
+
+        if (!skip){
+            let localFileModDate = new Date(stats["mtime"]);
+                
+            verboseLog(`   modified date: ${localFileModDate}`);
+
+            if ( localFileModDate > checkDate){
+                remoteFile = remoteFiles.find(function(f){return f.name === fileName});
+
+                if (remoteFile){
+                    verboseLog(`   file found in remote container`);
+                    const hash = md5File.sync(fqp);
+
+                    if (remoteFile.etag != hash){
+                        console.log(`   Copying changed file: ${fileName}`);
+                        copyFile(client, myContainer, fqp, fileName);
+                    }
+                    else{
+                        verboseLog(`   md5 same so skipping`);
+                    }
+                }
+                else{
+                    // File not in remote container so copy it over
+                    console.log(`   Copying new file: ${fileName}`);
+                    copyFile(client, myContainer, fqp, fileName);
+                }
+            }
+            else{
+                verboseLog(`   skipping because of date`);
+            }
+        }
+        
+        fileLoop++;
+    }
+
+    console.log(`Done.`);
+}
+
+function getRemoteFiles(localPath, myContainer, localFiles){
+    // Retrieve array 'remoteFiles' of all remote files in container
+    client.getFiles(myContainer, options, function(err, remoteFiles){
+        if (err){
+            console.log(`Error with remote container: ${myContainer}`);
+        }
+        else
+        {
+            copyFiles(localPath, myContainer, localFiles, remoteFiles);
+        }
+    });
 }
 
 function verboseLog(msg){
@@ -86,97 +187,25 @@ function verboseLog(msg){
     }
 }
 
-let count;
+
 // Loop through each directory we want to sync
 for (var containerLoop=0; containerLoop < ContainerPath.length; containerLoop++) {
     const localPath = ContainerPath[containerLoop];
     const myContainer = path.basename(localPath);
     verboseLog(`Local path set to: ${localPath}`);
 
-    // Get array 'items' all all local files in directory
-    fs.readdir(localPath, function(err, localFiles) {
+    if ( filesCopied <= maxFilesToCopy )
+    {
+        // Get array 'items' all all local files in directory
+        fs.readdir(localPath, function(err, localFiles) {
 
-        if (err){
-            console.log(`Directory does not exist: ${localPath}`);
-        }
-        else
-        {
-            // Retrieve array 'remoteFiles' of all remote files in container
-            client.getFiles(myContainer, options, function(err, remoteFiles){
-                console.log(`Container: '${myContainer}'`);
-                verboseLog(`Remote file count: ${remoteFiles.length}`);
-        
-                count = 0;
-                verboseLog(`Local file count: ${localFiles.length}`);
-
-                console.log(`${localFiles.length} local files`);
-
-                // Loop through all our local files to see which need to be synced
-                for (var fileLoop=0; fileLoop < localFiles.length; fileLoop++) {
-                    if ( ++count % 500 == 0){
-                        console.log(`Processed ${count}`)
-                    }
-
-                    fileName = localFiles[fileLoop];
-                    fqp = path.join(localPath, fileName);
-
-                    verboseLog(`File ${fileLoop + 1} of ${localFiles.length}`);
-                    verboseLog(`   full path: ${fqp}`);
-                    verboseLog(`   filename: ${fileName}`);
-                    
-                    let skip = false;
-                    let skipFilesLoop = 0;
-
-                    var stats = fs.statSync(fqp);
-                            
-                    if (stats.isDirectory()){
-                        skip = true;
-                        verboseLog(`   skipping directory`);
-                    }
-
-                    while(!skip && skipFilesLoop < skipFilesStartingWith.length){
-                        if (fileName.startsWith(skipFilesStartingWith[skipFilesLoop])){
-                            skip = true;
-                            verboseLog(`   skipping: ${skipFilesStartingWith[skipFilesLoop]}`);
-                        }
-
-                        skipFilesLoop++;
-                    }
-
-                    if (!skip){
-                        let localFileModDate = new Date(stats["mtime"]);
-                            
-                        verboseLog(`   modified date: ${localFileModDate}`);
-
-                        if ( localFileModDate > checkDate){
-                            remoteFile = remoteFiles.find(function(f){return f.name === fileName});
-
-                            if (remoteFile){
-                                verboseLog(`   file found in remote container`);
-                                const hash = md5File.sync(fqp);
-
-                                if (remoteFile.etag != hash){
-                                    console.log(`   Copying changed file: ${fileName}`);
-                                    copyFile(client, myContainer, fqp, fileName);
-                                }
-                                else{
-                                    verboseLog(`   md5 same so skipping`);
-                                }
-                            }
-                            else{
-                                // File not in remote container so copy it over
-                                console.log(`   Copying new file: ${fileName}`);
-                                copyFile(client, myContainer, fqp, fileName);
-                            }
-                        }
-                        else{
-                            verboseLog(`   skipping because of date`);
-                        }
-                    }
-                }
-
-                console.log(`Done.`);
-            });
-        }
-    });
+            if (err){
+                console.log(`Directory does not exist: ${localPath}`);
+            }
+            else
+            {
+                getRemoteFiles(localPath, myContainer, localFiles);
+            }
+        });
+    }
 }
