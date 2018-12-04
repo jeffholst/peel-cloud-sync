@@ -21,7 +21,7 @@ const maxFilesToCopy = 100; // maxium number of files to copy per execution
 const ContainerPath = [
     //"/tmp/JKH",
     //"/tmp/JKH2"
-   
+ 
     "/mnt/snap2/workfiles/webFiles/webPDFs",
     "/mnt/snap2/workfiles/webFiles/issuuPDFs",
     "/mnt/snap2/workfiles/webFiles/mobileAds",
@@ -31,7 +31,7 @@ const ContainerPath = [
     "/mnt/snap2/workfiles/webFiles/communityPhotos",
     "/mnt/snap2/workfiles/webFiles/communityAds",
     "/mnt/snap2/workfiles/webFiles/loweDown",
-   
+
 ];
 
 const skipFilesStartingWith = [
@@ -166,43 +166,40 @@ function copyFiles(localPath, myContainer, localFiles, remoteFiles){
 }
 
 function getRemoteFiles(localPath, myContainer, localFiles){
-    // Retrieve array 'remoteFiles' of all remote files in container
-    client.getFiles(myContainer, options, function(err, remoteFiles){
-        if (err){
-            console.log(`Error with remote container: ${myContainer}`);
-        }
-        else
-        {
-            copyFiles(localPath, myContainer, localFiles, remoteFiles);
-        }
+
+    return new Promise(resolve => {
+        // Retrieve array 'remoteFiles' of all remote files in container
+        client.getFiles(myContainer, options, function(err, remoteFiles){
+            if (err){
+                console.log(`Error with remote container: ${myContainer}`);
+                resolve();
+            }
+            else
+            {
+                copyFiles(localPath, myContainer, localFiles, remoteFiles);
+                resolve();
+            }
+        });
     });
 }
 
 async function readDirectory(localPath, myContainer){
-    // Get array 'items' all all local files in directory
 
-    if (fs.existsSync(localPath)) {
-        localFiles = fs.readdirSync(localPath);
+     // Get array 'items' all all local files in directory
 
-        for (var loop = 0; loop < localFiles.length; loop++){
-            await getRemoteFiles(localPath, myContainer, localFiles);
-            loop++;
-        }
-    }
-    else{
-        console.log(`Directory does not exist: ${localPath}`);
-    }
-}
+     verboseLog(`Local path set to: ${localPath}`);
 
-async function start(ContainerPath, containerLoop){
-    const localPath = ContainerPath[containerLoop];
-    const myContainer = path.basename(localPath);
-    verboseLog(`Local path set to: ${localPath}`);
+     if (fs.existsSync(localPath)) {
+         localFiles = fs.readdirSync(localPath);
 
-    if ( filesCopied <= maxFilesToCopy )
-    {
-        await readDirectory(localPath, myContainer);
-    }
+         for (var loop = 0; loop < localFiles.length; loop++){
+             var x = await getRemoteFiles(localPath, myContainer, localFiles);
+             loop++;
+         }
+     }
+     else{
+         console.log(`Directory does not exist: ${localPath}`);
+     }
 }
 
 function verboseLog(msg){
@@ -214,6 +211,16 @@ function verboseLog(msg){
 
 
 // Loop through each directory we want to sync
-for (var containerLoop=0; containerLoop < ContainerPath.length; containerLoop++) {
-    start(ContainerPath, containerLoop);
+async function Go(){
+    for (var containerLoop=0; containerLoop < ContainerPath.length; containerLoop++) {
+        const localPath = ContainerPath[containerLoop];
+        const myContainer = path.basename(localPath);
+        
+        if ( filesCopied <= maxFilesToCopy )
+        {
+            var x = await readDirectory(localPath, myContainer);
+        }
+    }
 }
+
+Go();
