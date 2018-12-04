@@ -14,7 +14,7 @@ const md5File = require('md5-file');
                                      
 */
 
-const verbose = false;      // Print verbose messages
+const verbose = true;      // Print verbose messages
 const maxFilesToCopy = 100; // maxium number of files to copy per execution
 
 // Array of all the paths to sync.  The basename of the path is the remote container name.
@@ -100,7 +100,7 @@ function copyFiles(localPath, myContainer, localFiles, remoteFiles){
     let fileLoop = 0;
     while (fileLoop < localFiles.length && filesCopied <= maxFilesToCopy)
     {
-        if ( ++count % 2500 == 0){
+        if ( ++count % 5000 == 0){
             console.log(`Processed ${count}`)
         }
 
@@ -178,7 +178,7 @@ function getRemoteFiles(localPath, myContainer, localFiles){
     });
 }
 
-function readDirectory(localPath, myContainer){
+async function readDirectory(localPath, myContainer){
     // Get array 'items' all all local files in directory
 
     if (fs.existsSync(localPath)) {
@@ -192,19 +192,17 @@ function readDirectory(localPath, myContainer){
     else{
         console.log(`Directory does not exist: ${localPath}`);
     }
-    
-    /*
-    fs.readdir(localPath, function(err, localFiles) {
+}
 
-        if (err){
-            console.log(`Directory does not exist: ${localPath}`);
-        }
-        else
-        {
-            getRemoteFiles(localPath, myContainer, localFiles);
-        }
-    });
-    */
+async function start(ContainerPath, containerLoop){
+    const localPath = ContainerPath[containerLoop];
+    const myContainer = path.basename(localPath);
+    verboseLog(`Local path set to: ${localPath}`);
+
+    if ( filesCopied <= maxFilesToCopy )
+    {
+        await readDirectory(localPath, myContainer);
+    }
 }
 
 function verboseLog(msg){
@@ -217,12 +215,5 @@ function verboseLog(msg){
 
 // Loop through each directory we want to sync
 for (var containerLoop=0; containerLoop < ContainerPath.length; containerLoop++) {
-    const localPath = ContainerPath[containerLoop];
-    const myContainer = path.basename(localPath);
-    verboseLog(`Local path set to: ${localPath}`);
-
-    if ( filesCopied <= maxFilesToCopy )
-    {
-        await readDirectory(localPath, myContainer);
-    }
+    start(ContainerPath, containerLoop);
 }
