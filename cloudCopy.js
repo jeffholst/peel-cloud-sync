@@ -60,7 +60,7 @@ var options = {
     limit: Infinity // Infinity = all files, otherwise use integer
 };
 
-function copyFile(myContainer, localFile, remoteFile){
+function copyFile(myContainer, localFile, remoteFile, msg){
     
     // Copies localFile to myContainer/remoteFile
 
@@ -74,11 +74,11 @@ function copyFile(myContainer, localFile, remoteFile){
     });
 
     dest.on('error', function(err) {
-        // TODO handle err as appropriate
+        console.log(`${filesCopied} - copied ${msg} file: ${localFile}`);
     });
 
     dest.on('success', function(file) {
-        // TODO handle successful upload case
+        console.log(`Error copying ${msg} file: ${localFile}`)
     });
 
     filesCopied++;
@@ -100,7 +100,7 @@ function copyFiles(localPath, myContainer, localFiles, remoteFiles){
     let fileLoop = 0;
     while (fileLoop < localFiles.length && filesCopied <= maxFilesToCopy)
     {
-        if ( ++count % 500 == 0){
+        if ( ++count % 2500 == 0){
             console.log(`Processed ${count}`)
         }
 
@@ -143,8 +143,7 @@ function copyFiles(localPath, myContainer, localFiles, remoteFiles){
                     const hash = md5File.sync(fqp);
 
                     if (remoteFile.etag != hash){
-                        console.log(`   Copying changed file: ${fileName}`);
-                        copyFile(client, myContainer, fqp, fileName);
+                        copyFile(client, myContainer, fqp, fileName, "modified");
                     }
                     else{
                         verboseLog(`   md5 same so skipping`);
@@ -152,15 +151,14 @@ function copyFiles(localPath, myContainer, localFiles, remoteFiles){
                 }
                 else{
                     // File not in remote container so copy it over
-                    console.log(`   Copying new file: ${fileName}`);
-                    copyFile(client, myContainer, fqp, fileName);
+                    copyFile(client, myContainer, fqp, fileName, "new");
                 }
             }
             else{
                 verboseLog(`   skipping because of date`);
             }
         }
-        
+
         fileLoop++;
     }
 
