@@ -178,7 +178,7 @@ function getRemoteFiles(localPath, myContainer, localFiles){
     });
 }
 
-async function readDirectory(localPath, myContainer){
+function readDirectory(localPath, myContainer){
     // Get array 'items' all all local files in directory
 
     if (fs.existsSync(localPath)) {
@@ -223,6 +223,6 @@ for (var containerLoop=0; containerLoop < ContainerPath.length; containerLoop++)
 
     if ( filesCopied <= maxFilesToCopy )
     {
-        readDirectory(localPath, myContainer);
+        await readDirectory(localPath, myContainer);
     }
 }
